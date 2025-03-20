@@ -1,0 +1,162 @@
+
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ตรวจสอบผู้ตรวจ</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    .highlight { color: red; font-weight: bold; font-size: 1.5em; }
+    .section { margin-top: 20px; }
+    input, select, button { padding: 8px; margin: 5px 0; font-size: 1em; }
+    .result-item { margin-left: 10px; }
+  </style>
+</head>
+<body>
+  <h1>ตรวจสอบผู้ตรวจ</h1>
+
+  <div class="section">
+    <label for="inspector">เลือกชื่อผู้ตรวจ:</label><br>
+    <select id="inspector"></select>
+  </div>
+
+  <div class="section">
+    <label for="shopId">ใส่รหัสร้าน:</label><br>
+    <input type="text" id="shopId" placeholder="เช่น 12">
+    <button onclick="checkData()">ตรวจสอบ</button>
+  </div>
+
+  <div id="result" class="section"></div>
+
+  <script>
+    let data = {};
+    let data2 = {};
+    let dataReady = false;
+
+    const inspectorSelect = document.getElementById('inspector');
+    const resultDiv = document.getElementById('result');
+    const button = document.querySelector('button');
+
+    button.disabled = true;
+    button.textContent = 'กำลังโหลดข้อมูล...';
+
+    Promise.all([
+      fetch('data_inspectors.json').then(res => res.json()),
+      fetch('data2.json').then(res => res.json())
+    ]).then(([inspectors, shops]) => {
+      data = inspectors;
+      const names = new Set();
+      for (const entries of Object.values(data)) {
+        entries.forEach(item => names.add(item["ผู้ตรวจ"]));
+      }
+      [...names].sort().forEach(name => {
+        const opt = document.createElement('option');
+        opt.value = name;
+        opt.textContent = name;
+        inspectorSelect.appendChild(opt);
+      });
+
+      shops.forEach(item => {
+        data2[item["รหัสร้าน"]] = item;
+      });
+
+      dataReady = true;
+      button.disabled = false;
+      button.textContent = 'ตรวจสอบ';
+    });
+    let data2 = {};
+    // โหลด data2.json ด้วย
+    fetch('data2.json')
+      .then(res => res.json())
+      .then(json => {
+        json.forEach(item => {
+          data2[item["รหัสร้าน"]] = item;
+        });
+      });
+    let data;
+    const inspectorSelect = document.getElementById('inspector');
+    const resultDiv = document.getElementById('result');
+
+    // โหลดข้อมูล JSON
+    fetch('data_inspectors.json')
+      .then(res => res.json())
+      .then(json => {
+        data = json;
+        const names = new Set();
+        for (const entries of Object.values(data)) {
+          entries.forEach(item => names.add(item["ผู้ตรวจ"]));
+        }
+        // ใส่ชื่อใน dropdown
+        [...names].sort().forEach(name => {
+          const opt = document.createElement('option');
+          opt.value = name;
+          opt.textContent = name;
+          inspectorSelect.appendChild(opt);
+        });
+      });
+
+    async function checkData() {
+      // รอโหลด data2 ถ้ายังไม่เสร็จ
+      if (Object.keys(data2).length === 0) {
+        resultDiv.innerHTML = "<p style='color:red'>กำลังโหลดข้อมูลร้าน... กรุณารอสักครู่แล้วกดตรวจสอบอีกครั้ง</p>";
+        return;
+      }
+    
+      const selectedName = inspectorSelect.value;
+      const shopId = document.getElementById('shopId').value.trim();
+      const entries = data[shopId];
+
+      resultDiv.innerHTML = '';
+
+      // แสดงข้อมูลร้านจาก data2.json
+      const shopInfo = data2[shopId];
+      if (shopInfo) {
+        const infoHtml = `
+          <div style="border: 1px solid #ccc; padding: 10px; margin-bottom: 10px;">
+            <strong>ชื่อสาขา:</strong> ${shopInfo["ชื่อสาขา"]} <br>
+            <strong>ภาค:</strong> ${shopInfo["ภาค"]} |
+            <strong>จังหวัด:</strong> ${shopInfo["จังหวัด"]} <br>
+            <strong>สถานะ:</strong> ${shopInfo["สถานะ"]} |
+            <strong>โทรศัพท์:</strong> ${shopInfo["โทรศัพท์"]} <br>
+            <strong>ผู้ตรวจประจำ:</strong> ${shopInfo["ชื่อผู้ตรวจ"]}
+          </div>`;
+        resultDiv.innerHTML += infoHtml;
+      }
+    
+
+      if (!entries) {
+        resultDiv.innerHTML = `<p style="color:red">ไม่พบข้อมูลร้านนี้</p>`;
+        return;
+      }
+
+      let count = 0;
+      const list = document.createElement('ul');
+      entries.forEach(item => {
+        const li = document.createElement('li');
+        li.innerHTML = `📅 ${item["เดือน"]}: <span class="result-item">${item["ผู้ตรวจ"]}</span>`;
+        if (item["ผู้ตรวจ"] === selectedName) {
+          count++;
+          li.querySelector('.result-item').style.color = 'red';
+          li.querySelector('.result-item').style.fontWeight = 'bold';
+        }
+        list.appendChild(li);
+      });
+
+      resultDiv.appendChild(document.createElement('hr'));
+      resultDiv.appendChild(list);
+
+      if (count > 1) {
+        const warn = document.createElement('div');
+        warn.className = 'highlight';
+        warn.textContent = `⚠️ ชื่อ "${selectedName}" ซ้ำ ${count} เดือน!`;
+        resultDiv.appendChild(warn);
+      }
+    }
+  </script>
+</body>
+</html>
+
+      if (!shopInfo) {
+        resultDiv.innerHTML += `<p style='color:red'>ไม่พบข้อมูลร้านนี้ใน data2.json</p>`;
+      }
