@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ตรวจสอบผู้ตรวจ</title>
+  <title>ตรวจสอบผู้ตรวจตามเดือน</title>
   <link href="https://fonts.googleapis.com/css2?family=Kanit&display=swap" rel="stylesheet">
   <style>
     body {
@@ -15,85 +15,78 @@
       color: #333;
     }
     header {
-      background-color: #388e3c;
+      background-color: #2e7d32;
       color: white;
       padding: 20px;
       text-align: center;
-      font-size: 1.8em;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      font-size: 1.6em;
     }
     .container {
       padding: 20px;
       max-width: 480px;
       margin: auto;
     }
+    .card {
+      background-color: #fff;
+      border-radius: 10px;
+      padding: 15px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
     .section {
       margin-bottom: 20px;
     }
     label {
       display: block;
-      font-weight: bold;
       margin-bottom: 5px;
+      font-weight: bold;
     }
     select, input, button {
       width: 100%;
       padding: 12px;
-      margin-top: 5px;
       border-radius: 10px;
       border: 1px solid #ccc;
       font-size: 1em;
       box-sizing: border-box;
+      margin-bottom: 10px;
     }
     button {
       background-color: #4CAF50;
       color: white;
       border: none;
-      margin-top: 10px;
     }
     button:disabled {
-      background-color: #9CCC9C;
+      background-color: #a5d6a7;
     }
-    button:hover {
-      background-color: #43A047;
-    }
-    .result-item {
-      margin-left: 10px;
-    }
-    .highlight {
-      color: #d32f2f;
-      font-weight: bold;
+    .result {
       font-size: 1.2em;
-      margin-top: 15px;
+      text-align: center;
+      margin-top: 10px;
     }
-    ul {
-      padding-left: 20px;
-    }
-    .card {
-      background-color: #ffffff;
-      border-radius: 10px;
-      padding: 15px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    .notfound {
+      color: red;
+      font-weight: bold;
     }
   </style>
 </head>
 <body>
-  <header>ตรวจสอบผู้ตรวจ</header>
+  <header>ตรวจสอบผู้ตรวจตามเดือน</header>
   <div class="container">
-    <div class="section card">
-      <label for="inspector">เลือกชื่อผู้ตรวจ:</label>
-      <select id="inspector"></select>
+    <div class="card section">
+      <label for="monthSelect">เลือกเดือน:</label>
+      <select id="monthSelect"></select>
 
       <label for="shopId">ใส่รหัสร้าน:</label>
       <input type="text" id="shopId" placeholder="เช่น 1234">
-      <button onclick="checkData()" disabled>กำลังโหลดข้อมูล...</button>
+
+      <button onclick="checkInspector()" disabled>กำลังโหลดข้อมูล...</button>
     </div>
 
-    <div id="result" class="card" style="margin-top: 20px;"></div>
+    <div id="result" class="card" style="display:none;"></div>
   </div>
 
   <script>
     let data = {};
-    const inspectorSelect = document.getElementById('inspector');
+    const monthSelect = document.getElementById('monthSelect');
     const resultDiv = document.getElementById('result');
     const button = document.querySelector('button');
 
@@ -101,53 +94,58 @@
       .then(res => res.json())
       .then(json => {
         data = json;
-        const names = new Set();
+
+        // รวมเดือนแบบไม่เอาวัน
+        const months = new Set();
         for (const entries of Object.values(data)) {
-          entries.forEach(item => names.add(item["ผู้ตรวจ"]));
+          entries.forEach(item => {
+            const fullDate = item["เดือน"];
+            const parts = fullDate.split("/");
+            const monthYear = parts.length === 3 ? parts[1] + '/' + parts[2] : fullDate;
+            months.add(monthYear);
+          });
         }
-        [...names].sort().forEach(name => {
+        const months = new Set();
+        for (const entries of Object.values(data)) {
+          entries.forEach(item => months.add(item["เดือน"]));
+        }
+        [...months].sort().forEach(month => {
           const opt = document.createElement('option');
-          opt.value = name;
-          opt.textContent = name;
-          inspectorSelect.appendChild(opt);
+          opt.value = month;
+          opt.textContent = month;
+          monthSelect.appendChild(opt);
         });
 
         button.disabled = false;
-        button.textContent = 'ตรวจสอบ';
+        button.textContent = "ตรวจสอบ";
       });
 
-    function checkData() {
-      const selectedName = inspectorSelect.value;
+    function checkInspector() {
+      const month = monthSelect.value;
       const shopId = document.getElementById('shopId').value.trim();
       const entries = data[shopId];
 
+      resultDiv.style.display = 'block';
       resultDiv.innerHTML = '';
 
       if (!entries) {
-        resultDiv.innerHTML = `<p style='color:red'>ไม่พบข้อมูลรหัสร้านใน data_inspectors.json</p>`;
+        resultDiv.innerHTML = "<p class='notfound'>ไม่พบรหัสร้านนี้</p>";
         return;
       }
 
-      let count = 0;
-      const list = document.createElement('ul');
-      entries.forEach(item => {
-        const li = document.createElement('li');
-        li.innerHTML = `📅 ${item["เดือน"]}: <span class="result-item">${item["ผู้ตรวจ"]}</span>`;
-        if (item["ผู้ตรวจ"] === selectedName) {
-          count++;
-          li.querySelector('.result-item').style.color = '#d32f2f';
-          li.querySelector('.result-item').style.fontWeight = 'bold';
-        }
-        list.appendChild(li);
+      const entry = entries.find(e => {
+        const parts = e["เดือน"].split("/");
+        const my = parts.length === 3 ? parts[1] + '/' + parts[2] : e["เดือน"];
+        return my === month;
       });
-
-      resultDiv.appendChild(list);
-
-      if (count > 1) {
-        const warn = document.createElement('div');
-        warn.className = 'highlight';
-        warn.textContent = `⚠️ ชื่อ "${selectedName}" ซ้ำ ${count} เดือน!`;
-        resultDiv.appendChild(warn);
+      if (!entry) {
+        resultDiv.innerHTML = "<p class='notfound'>ไม่มีข้อมูลร้านนี้ในเดือนที่เลือก</p>";
+      } else {
+        
+        const selectedName = document.getElementById('inspectorName').value.trim();
+        const isMatch = entry["ผู้ตรวจ"] === selectedName;
+        resultDiv.innerHTML = `<p>เดือน ${entry["เดือน"]}<br><strong>ผู้ตรวจ:</strong> <span style="color: ${isMatch ? 'red' : 'black'}; font-size: ${isMatch ? '1.4em' : '1em'}">${entry["ผู้ตรวจ"]}</span></p>`;
+    
       }
     }
   </script>
